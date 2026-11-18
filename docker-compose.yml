@@ -1,0 +1,44 @@
+# =============================================================================
+# Cấu hình Docker Compose cho Hệ thống Website Bán Mỹ Phẩm & Quản Lý Bán Hàng
+# Khởi chạy: docker compose up -d
+# Dừng & xóa volume (nếu muốn nạp lại database.sql từ đầu): docker compose down -v
+# =============================================================================
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: cosmetic_store_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "123456"
+      MYSQL_DATABASE: cosmetic_store
+      TZ: Asia/Ho_Chi_Minh
+    ports:
+      - "3306:3306"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+07:00
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/database.sql:/docker-entrypoint-initdb.d/01-database.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  adminer:
+    image: adminer:latest
+    container_name: cosmetic_store_adminer
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      ADMINER_DEFAULT_SERVER: mysql
+    ports:
+      - "8080:8080"
+
+volumes:
+  mysql_data:
