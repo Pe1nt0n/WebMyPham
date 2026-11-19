@@ -182,7 +182,11 @@ export function HomePage() {
         title: 'Làn Da Căng Bóng Chuẩn Dược Mỹ Phẩm Pháp',
         description:
           "Đánh thức sức sống làn da từ cấp độ tế bào với hệ hoạt chất tinh khiết từ La Roche-Posay, Paula's Choice và The Ordinary — phục hồi màng ẩm tự nhiên và bảo vệ da tối ưu mỗi ngày.",
-        brands: ['La Roche-Posay', "Paula's Choice", 'The Ordinary'],
+        brands: [
+          { id: 1, name: 'La Roche-Posay' },
+          { id: 6, name: "Paula's Choice" },
+          { id: 9, name: 'The Ordinary' },
+        ],
         ctaLabel: 'Khám phá Chăm sóc da',
         ctaTo: categoryLinks.skincare,
         secondaryLabel: 'Dành cho da nhạy cảm',
@@ -201,7 +205,11 @@ export function HomePage() {
         title: 'Sắc Môi Nhung Lì & Lớp Nền Trong Veo',
         description:
           'Tôn vinh đường nét thanh tú tự nhiên cùng bảng màu son kem mịn mượt 3CE, phấn nước kiềm dầu 24 giờ Laneige Neo Cushion và tinh chất trà xanh đảo Jeju Innisfree.',
-        brands: ['3CE Stylenanda', 'Laneige', 'Innisfree'],
+        brands: [
+          { id: 4, name: '3CE' },
+          { id: 8, name: 'Laneige' },
+          { id: 3, name: 'Innisfree' },
+        ],
         ctaLabel: 'Mua sắm Trang điểm',
         ctaTo: categoryLinks.makeup,
         secondaryLabel: 'Khám phá K-Beauty',
@@ -220,7 +228,10 @@ export function HomePage() {
         title: 'Dấu Ấn Hương Thơm Thanh Khiết',
         description:
           'Đắm chìm trong nghệ thuật chế tác hương hoa Pháp quyến rũ từ nhà mốt Dior kết hợp liệu trình chăm sóc cơ thể và mái tóc thuần chay lành tính từ Cocoon Việt Nam.',
-        brands: ['Dior Parfums', 'Cocoon Vietnam'],
+        brands: [
+          { id: 10, name: 'Dior' },
+          { id: 7, name: 'Cocoon' },
+        ],
         ctaLabel: 'Khám phá Nước hoa',
         ctaTo: categoryLinks.fragrance,
         secondaryLabel: 'Chăm sóc cơ thể & tóc',
@@ -368,13 +379,16 @@ export function HomePage() {
                 <span className="text-[11px] font-semibold uppercase tracking-widest text-stone-400 mr-1">
                   Tâm điểm:
                 </span>
-                {currentSlide.brands.map((brandLabel) => (
-                  <span
-                    key={brandLabel}
-                    className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-champagne-100"
+                {currentSlide.brands.map((brandObj) => (
+                  <Link
+                    key={brandObj.id}
+                    to={`/products?brand_id=${brandObj.id}`}
+                    title={`Duyệt mỹ phẩm thương hiệu ${brandObj.name}`}
+                    className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 backdrop-blur-sm px-3 py-1 text-xs font-semibold text-champagne-100 hover:border-white hover:bg-white hover:text-stone-950 transition-all shadow-sm"
                   >
-                    {brandLabel}
-                  </span>
+                    <span>{brandObj.name}</span>
+                    <ArrowRight className="h-2.5 w-2.5 opacity-60" />
+                  </Link>
                 ))}
               </div>
 

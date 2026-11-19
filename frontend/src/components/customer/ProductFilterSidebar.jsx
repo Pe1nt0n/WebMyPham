@@ -53,6 +53,11 @@ export function ProductFilterSidebar({
     );
   }, [brands, brandQuery]);
 
+  const selectedBrand = useMemo(
+    () => brands.find((b) => String(b.id) === String(filters.brand_id)),
+    [brands, filters.brand_id]
+  );
+
   const handleSearchSubmit = (event) => {
     event.preventDefault();
     onUpdateFilters({ search: searchInput.trim() });
@@ -198,12 +203,18 @@ export function ProductFilterSidebar({
               >
                 {!filters.category_id && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
               </span>
-              <span>Tất cả sản phẩm</span>
+              <span>
+                {selectedBrand ? `Tất cả SP ${selectedBrand.name}` : 'Tất cả sản phẩm'}
+              </span>
             </span>
           </button>
 
           {categories.map((cat) => {
             const isSelected = String(filters.category_id) === String(cat.id);
+            const brandHasCat = selectedBrand
+              ? selectedBrand.category_ids?.includes(Number(cat.id))
+              : true;
+
             return (
               <button
                 key={cat.id}
@@ -229,14 +240,24 @@ export function ProductFilterSidebar({
                   >
                     {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
                   </span>
-                  <span className="truncate">{cat.name}</span>
+                  <span className={`truncate ${selectedBrand && !brandHasCat ? 'text-stone-400' : ''}`}>
+                    {cat.name}
+                  </span>
                 </span>
                 <span
                   className={`shrink-0 text-[11px] ${
-                    isSelected ? 'font-bold text-lumiere-700' : 'text-stone-400'
+                    isSelected
+                      ? 'font-bold text-lumiere-700'
+                      : selectedBrand && !brandHasCat
+                      ? 'text-stone-300'
+                      : 'text-stone-400'
                   }`}
                 >
-                  ({cat.product_count ?? 0})
+                  {selectedBrand
+                    ? brandHasCat
+                      ? '✓ có hàng'
+                      : '0 sp'
+                    : `(${cat.product_count ?? 0})`}
                 </span>
               </button>
             );

@@ -13,12 +13,13 @@ const {
 } = require('../utils/validators');
 
 /**
- * GET /api/categories — Danh sách danh mục mỹ phẩm kèm số lượng sản phẩm ACTIVE
+ * GET /api/categories — Danh sách danh mục mỹ phẩm kèm số lượng sản phẩm ACTIVE & danh sách brand_ids
  */
 const getCategories = asyncHandler(async (_req, res) => {
   const [rows] = await pool.query(
     `SELECT c.id, c.name, c.description,
-            COUNT(p.id) AS product_count
+            COUNT(p.id) AS product_count,
+            GROUP_CONCAT(DISTINCT p.brand_id) AS brand_ids
      FROM categories c
      LEFT JOIN products p ON p.category_id = c.id AND p.status = 'ACTIVE'
      GROUP BY c.id, c.name, c.description
@@ -28,18 +29,20 @@ const getCategories = asyncHandler(async (_req, res) => {
   const data = rows.map((row) => ({
     ...row,
     product_count: Number(row.product_count),
+    brand_ids: row.brand_ids ? String(row.brand_ids).split(',').map(Number) : [],
   }));
 
   return sendSuccess(res, 200, 'Lấy danh sách danh mục mỹ phẩm thành công', data);
 });
 
 /**
- * GET /api/brands — Danh sách thương hiệu mỹ phẩm kèm xuất xứ và số lượng sản phẩm ACTIVE
+ * GET /api/brands — Danh sách thương hiệu mỹ phẩm kèm xuất xứ, số lượng sản phẩm ACTIVE & category_ids
  */
 const getBrands = asyncHandler(async (_req, res) => {
   const [rows] = await pool.query(
     `SELECT b.id, b.name, b.origin,
-            COUNT(p.id) AS product_count
+            COUNT(p.id) AS product_count,
+            GROUP_CONCAT(DISTINCT p.category_id) AS category_ids
      FROM brands b
      LEFT JOIN products p ON p.brand_id = b.id AND p.status = 'ACTIVE'
      GROUP BY b.id, b.name, b.origin
@@ -49,6 +52,7 @@ const getBrands = asyncHandler(async (_req, res) => {
   const data = rows.map((row) => ({
     ...row,
     product_count: Number(row.product_count),
+    category_ids: row.category_ids ? String(row.category_ids).split(',').map(Number) : [],
   }));
 
   return sendSuccess(res, 200, 'Lấy danh sách thương hiệu thành công', data);

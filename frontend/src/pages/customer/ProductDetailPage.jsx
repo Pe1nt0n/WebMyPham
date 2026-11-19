@@ -22,7 +22,7 @@ import {
   Truck,
   Zap,
 } from 'lucide-react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getApiErrorMessage, isCanceledRequest, publicApi } from '../../api/clients';
 import { ProductImage } from '../../components/common/ProductImage';
 import { ProductCard } from '../../components/customer/ProductCard';
@@ -142,11 +142,13 @@ function buildExpertUsageSteps(product) {
 export function ProductDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { addToCart, getItemQuantity } = useCart();
   const toast = useToast();
 
   const [product, setProduct] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
+  const [brandProducts, setBrandProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [quantity, setQuantity] = useState(1);
@@ -169,6 +171,7 @@ export function ProductDetailPage() {
         const detail = res.data?.data;
         setProduct(detail);
 
+        // Tải các sản phẩm tương tự cùng danh mục
         if (detail?.category_id) {
           try {
             const relRes = await publicApi.get('/products', {
@@ -186,6 +189,26 @@ export function ProductDetailPage() {
           }
         } else {
           setRelatedProducts([]);
+        }
+
+        // Tải các sản phẩm cùng thương hiệu để khách chọn tiếp không bị mất ngữ cảnh thương hiệu
+        if (detail?.brand_id) {
+          try {
+            const bRes = await publicApi.get('/products', {
+              params: { brand_id: detail.brand_id },
+              signal: controller.signal,
+            });
+            const bList = Array.isArray(bRes.data?.data) ? bRes.data.data : [];
+            setBrandProducts(
+              bList.filter((item) => Number(item.id) !== Number(detail.id)).slice(0, 4)
+            );
+          } catch (bErr) {
+            if (!isCanceledRequest(bErr)) {
+              setBrandProducts([]);
+            }
+          }
+        } else {
+          setBrandProducts([]);
         }
       })
       .catch((err) => {
@@ -345,34 +368,74 @@ export function ProductDetailPage() {
 
   return (
     <div className="pb-20">
-      {/* Breadcrumb Bar: Trang chủ / {category_name} / {name} */}
+      {/* Breadcrumb Bar + Nút quay lại giữ nguyên bộ lọc thương hiệu */}
       <div className="border-b border-stone-200/70 bg-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3.5">
-          <nav
-            aria-label="Breadcrumb"
-            className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-stone-500"
-          >
-            <Link to="/" className="hover:text-lumiere-700 transition-colors">
-              Trang chủ
-            </Link>
-            <ChevronRight className="h-3.5 w-3.5 text-stone-400 shrink-0" />
-            {product.category_name ? (
-              <Link
-                to={`/products?category_id=${product.category_id}`}
-                className="hover:text-lumiere-700 transition-colors"
-              >
-                {product.category_name}
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <nav
+              aria-label="Breadcrumb"
+              className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-stone-500"
+            >
+              <Link to="/" className="hover:text-lumiere-700 transition-colors">
+                Trang chủ
               </Link>
-            ) : (
-              <Link to="/products" className="hover:text-lumiere-700 transition-colors">
-                Cửa hàng mỹ phẩm
-              </Link>
-            )}
-            <ChevronRight className="h-3.5 w-3.5 text-stone-400 shrink-0" />
-            <span className="text-stone-900 font-semibold truncate max-w-[240px] sm:max-w-md">
-              {product.name}
-            </span>
-          </nav>
+              <ChevronRight className="h-3.5 w-3.5 text-stone-400 shrink-0" />
+
+              {product.brand_name && (
+                <>
+                  <Link
+                    to={`/products?brand_id=${product.brand_id}`}
+                    className="font-semibold text-stone-700 hover:text-lumiere-700 transition-colors"
+                  >
+                    {product.brand_name}
+                  </Link>
+                  <ChevronRight className="h-3.5 w-3.5 text-stone-400 shrink-0" />
+                </>
+              )}
+
+              {product.category_name ? (
+                <Link
+                  to={
+                    product.brand_id
+                      ? `/products?brand_id=${product.brand_id}&category_id=${product.category_id}`
+                      : `/products?category_id=${product.category_id}`
+                  }
+                  className="hover:text-lumiere-700 transition-colors"
+                >
+                  {product.category_name}
+                </Link>
+              ) : (
+                <Link to="/products" className="hover:text-lumiere-700 transition-colors">
+                  Cửa hàng mỹ phẩm
+                </Link>
+              )}
+              <ChevronRight className="h-3.5 w-3.5 text-stone-400 shrink-0" />
+              <span className="text-stone-900 font-semibold truncate max-w-[200px] sm:max-w-xs md:max-w-md">
+                {product.name}
+              </span>
+            </nav>
+
+            {/* Nút quay lại nhanh giữ nguyên bộ lọc thương hiệu không bị reset */}
+            <button
+              type="button"
+              onClick={() => {
+                const targetBrandId = location.state?.fromBrandId || product.brand_id;
+                if (targetBrandId) {
+                  navigate(`/products?brand_id=${targetBrandId}`);
+                } else if (window.history.length > 1) {
+                  navigate(-1);
+                } else {
+                  navigate('/products');
+                }
+              }}
+              className="group inline-flex items-center gap-1.5 rounded-full border border-stone-200/90 bg-[#FAF8F5] px-3.5 py-1.5 text-xs font-semibold text-stone-700 transition-all hover:border-stone-900 hover:bg-white hover:text-stone-950 shrink-0 shadow-xs"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+              <span>
+                Quay lại {product.brand_name ? `sản phẩm ${product.brand_name}` : 'cửa hàng'}
+              </span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -882,6 +945,37 @@ export function ProductDetailPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {relatedProducts.map((rel) => (
                 <ProductCard key={rel.id} product={rel} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* SẢN PHẨM CÙNG THƯƠNG HIỆU (Giúp chọn nhiều sản phẩm cùng hãng mà không bị reset) */}
+        {brandProducts.length > 0 && (
+          <div className="mt-16 pt-12 border-t border-stone-200/80">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-7">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-[0.2em] text-lumiere-700">
+                  From {product.brand_name || 'Brand Boutique'}
+                </span>
+                <h2 className="mt-1.5 font-serif text-2xl sm:text-3xl font-bold text-stone-950">
+                  Sản Phẩm Cùng Thương Hiệu {product.brand_name}
+                </h2>
+              </div>
+              {product.brand_id && (
+                <Link
+                  to={`/products?brand_id=${product.brand_id}`}
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-lumiere-800 hover:text-lumiere-600 transition-colors"
+                >
+                  <span>Xem trọn bộ sản phẩm {product.brand_name}</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {brandProducts.map((bp) => (
+                <ProductCard key={bp.id} product={bp} />
               ))}
             </div>
           </div>

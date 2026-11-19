@@ -55,6 +55,7 @@ export function ProductCard({ product }) {
       <div className="relative aspect-[4/4.5] w-full overflow-hidden bg-[#FAF8F5]">
         <Link
           to={`/products/${product.id}`}
+          state={{ fromBrandId: product.brand_id, fromBrandName: product.brand_name }}
           aria-label={product.name}
           className="block h-full w-full focus:outline-none"
         >
@@ -131,11 +132,21 @@ export function ProductCard({ product }) {
 
       {/* Thân thẻ phân cấp 4 tầng tối giản, thoáng mắt */}
       <div className="flex flex-1 flex-col p-3.5 sm:p-4">
-        {/* 1) Hàng trên: Thương hiệu in hoa + Đánh giá sao */}
+        {/* 1) Hàng trên: Thương hiệu in hoa (Click để duyệt thương hiệu) + Đánh giá sao */}
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-[11px] font-bold uppercase tracking-[0.14em] text-lumiere-700">
-            {product.brand_name || 'Lumière'}
-          </span>
+          {product.brand_id ? (
+            <Link
+              to={`/products?brand_id=${product.brand_id}`}
+              title={`Xem các sản phẩm từ ${product.brand_name || 'thương hiệu này'}`}
+              className="truncate text-[11px] font-bold uppercase tracking-[0.14em] text-lumiere-700 hover:text-stone-950 hover:underline transition-colors"
+            >
+              {product.brand_name || 'Lumière'}
+            </Link>
+          ) : (
+            <span className="truncate text-[11px] font-bold uppercase tracking-[0.14em] text-lumiere-700">
+              {product.brand_name || 'Lumière'}
+            </span>
+          )}
           <span
             className="shrink-0 text-[11px] font-medium text-stone-500"
             aria-label={`Đánh giá ${ratingScore} trên 5 sao`}
@@ -147,6 +158,7 @@ export function ProductCard({ product }) {
         {/* 2) Tên sản phẩm line-clamp-2 sắc nét */}
         <Link
           to={`/products/${product.id}`}
+          state={{ fromBrandId: product.brand_id, fromBrandName: product.brand_name }}
           title={product.name}
           className="mt-1.5 line-clamp-2 min-h-[2.45rem] text-[14px] font-medium leading-snug text-stone-800 transition-colors group-hover:text-lumiere-700"
         >

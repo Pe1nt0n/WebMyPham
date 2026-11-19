@@ -184,9 +184,20 @@ export function ProductQuickViewModal({ product: initialProduct, onClose, onAdde
         <div className="md:col-span-7 flex flex-col overflow-y-auto p-5 sm:p-7">
           {/* Thương hiệu & Xuất xứ */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="font-bold uppercase tracking-[0.16em] text-lumiere-700">
-              {resolved.brand_name || 'Lumière Beauté'}
-            </span>
+            {resolved.brand_id ? (
+              <Link
+                to={`/products?brand_id=${resolved.brand_id}`}
+                onClick={onClose}
+                title={`Xem thêm sản phẩm từ thương hiệu ${resolved.brand_name}`}
+                className="font-bold uppercase tracking-[0.16em] text-lumiere-700 hover:text-stone-950 hover:underline transition-colors"
+              >
+                {resolved.brand_name || 'Lumière Beauté'}
+              </Link>
+            ) : (
+              <span className="font-bold uppercase tracking-[0.16em] text-lumiere-700">
+                {resolved.brand_name || 'Lumière Beauté'}
+              </span>
+            )}
             {resolved.brand_origin && (
               <span className="inline-flex items-center gap-1 text-stone-500">
                 <span>•</span>

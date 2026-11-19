@@ -77,6 +77,8 @@ export function StorefrontLayout({ children }) {
   const [searchParams] = useSearchParams();
 
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+  const [brands, setBrands] = useState([]);
+  const [brandDropdownOpen, setBrandDropdownOpen] = useState(false);
   const [quickSearch, setQuickSearch] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -87,6 +89,7 @@ export function StorefrontLayout({ children }) {
   const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
 
   const userMenuRef = useRef(null);
+  const brandDropdownRef = useRef(null);
   const searchBoxRef = useRef(null);
   const pathnameRef = useRef(location.pathname);
 
@@ -94,15 +97,21 @@ export function StorefrontLayout({ children }) {
     pathnameRef.current = location.pathname;
   }, [location.pathname]);
 
-  // Tải danh mục động từ GET /api/categories cho thanh Category Navigation Bar
+  // Tải danh mục & thương hiệu động cho thanh điều hướng Header
   useEffect(() => {
     const controller = new AbortController();
-    publicApi
-      .get('/categories', { signal: controller.signal })
-      .then((res) => {
-        const list = Array.isArray(res.data?.data) ? res.data.data : [];
-        if (list.length > 0) {
-          setCategories(list);
+    Promise.all([
+      publicApi.get('/categories', { signal: controller.signal }),
+      publicApi.get('/brands', { signal: controller.signal }),
+    ])
+      .then(([catRes, brandRes]) => {
+        const catList = Array.isArray(catRes.data?.data) ? catRes.data.data : [];
+        if (catList.length > 0) {
+          setCategories(catList);
+        }
+        const brandList = Array.isArray(brandRes.data?.data) ? brandRes.data.data : [];
+        if (brandList.length > 0) {
+          setBrands(brandList);
         }
       })
       .catch((err) => {
@@ -123,13 +132,14 @@ export function StorefrontLayout({ children }) {
   // Đóng mọi dropdown / drawer khi chuyển route
   useEffect(() => {
     setUserMenuOpen(false);
+    setBrandDropdownOpen(false);
     setMobileMenuOpen(false);
     setSearchFocused(false);
     setCartDrawerOpen(false);
     setQuickViewProduct(null);
   }, [location.pathname, location.search]);
 
-  // Đóng dropdown tài khoản & gợi ý tìm kiếm khi click ra ngoài
+  // Đóng dropdown tài khoản & gợi ý tìm kiếm & dropdown thương hiệu khi click ra ngoài hoặc bấm Escape
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
@@ -138,9 +148,23 @@ export function StorefrontLayout({ children }) {
       if (searchBoxRef.current && !searchBoxRef.current.contains(event.target)) {
         setSearchFocused(false);
       }
+      if (brandDropdownRef.current && !brandDropdownRef.current.contains(event.target)) {
+        setBrandDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setUserMenuOpen(false);
+        setSearchFocused(false);
+        setBrandDropdownOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   // Lắng nghe custom event mở Mini-Cart & Quick-View toàn trang (chỉ render 1 instance duy nhất)
@@ -225,10 +249,19 @@ export function StorefrontLayout({ children }) {
   };
 
   const activeCategoryId = location.pathname === '/products' ? searchParams.get('category_id') || '' : '';
+  const activeBrandId = location.pathname === '/products' ? searchParams.get('brand_id') || '' : '';
+  const activeBrand = useMemo(
+    () => brands.find((b) => String(b.id) === String(activeBrandId)),
+    [brands, activeBrandId]
+  );
   const activeMaxPrice = location.pathname === '/products' ? searchParams.get('max_price') || '' : '';
   const activeSort = location.pathname === '/products' ? searchParams.get('sort') || '' : '';
   const isAllProductsActive =
-    location.pathname === '/products' && !activeCategoryId && activeMaxPrice !== '300000' && activeSort !== 'newest';
+    location.pathname === '/products' &&
+    !activeCategoryId &&
+    !activeBrandId &&
+    activeMaxPrice !== '300000' &&
+    activeSort !== 'newest';
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FDFBF9] text-stone-800 selection:bg-lumiere-200 selection:text-lumiere-950">
@@ -473,14 +506,14 @@ export function StorefrontLayout({ children }) {
           </div>
         </div>
 
-        {/* Tầng 2: Category Navigation Bar trên Desktop */}
-        <div className="hidden lg:block border-t border-stone-100 bg-white/95">
+        {/* Tầng 2: Category Navigation Bar trên Desktop (Không để overflow-x-auto để tránh lỗi cắt xén dropdown) */}
+        <div className="hidden lg:block border-t border-stone-100 bg-white/95 relative z-30">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <nav
               aria-label="Danh mục mỹ phẩm chính"
-              className="flex items-center justify-between gap-4 overflow-x-auto py-2.5 text-[13px]"
+              className="relative flex items-center justify-between gap-4 py-2.5 text-[13px]"
             >
-              <div className="flex items-center gap-6 xl:gap-7">
+              <div className="flex items-center gap-5 xl:gap-7">
                 <Link
                   to="/products"
                   className={`whitespace-nowrap font-semibold transition-colors ${
@@ -492,12 +525,130 @@ export function StorefrontLayout({ children }) {
                   Tất cả sản phẩm
                 </Link>
 
+                {/* Dropdown Duyệt Thương Hiệu Chính Hãng */}
+                {brands.length > 0 && (
+                  <div className="relative" ref={brandDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setBrandDropdownOpen((prev) => !prev)}
+                      className={`inline-flex items-center gap-1.5 whitespace-nowrap font-semibold transition-colors py-1 ${
+                        activeBrandId || brandDropdownOpen
+                          ? 'text-lumiere-700 font-bold'
+                          : 'text-stone-800 hover:text-lumiere-700'
+                      }`}
+                    >
+                      {activeBrand ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-lumiere-50 px-2.5 py-0.5 text-xs text-lumiere-800 font-bold border border-lumiere-200">
+                          <span>Hãng: {activeBrand.name}</span>
+                        </span>
+                      ) : (
+                        <span>Thương hiệu</span>
+                      )}
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                          brandDropdownOpen ? 'rotate-180 text-lumiere-700' : 'text-stone-400'
+                        }`}
+                      />
+                    </button>
+
+                    {brandDropdownOpen && (
+                      <div className="absolute left-0 top-full mt-2 w-[480px] sm:w-[520px] rounded-2xl border border-stone-200/90 bg-white p-4 shadow-2xl shadow-stone-950/15 animate-fade-in z-50">
+                        <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-lumiere-600" />
+                            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-900">
+                              Thương hiệu chính hãng ({brands.length})
+                            </span>
+                          </div>
+                          <Link
+                            to="/products"
+                            onClick={() => setBrandDropdownOpen(false)}
+                            className="text-[11px] font-semibold text-lumiere-700 hover:text-lumiere-900 hover:underline inline-flex items-center gap-1"
+                          >
+                            <span>Xem tất cả SP</span>
+                            <ArrowRight className="h-3 w-3" />
+                          </Link>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-2 max-h-[360px] overflow-y-auto pr-1">
+                          {brands.map((b) => {
+                            const isSelected = String(activeBrandId) === String(b.id);
+                            return (
+                              <Link
+                                key={b.id}
+                                to={`/products?brand_id=${b.id}`}
+                                onClick={() => setBrandDropdownOpen(false)}
+                                className={`group flex items-center justify-between rounded-xl px-3 py-2.5 border transition-all ${
+                                  isSelected
+                                    ? 'border-lumiere-600 bg-lumiere-50/90 text-lumiere-900 font-bold shadow-xs'
+                                    : 'border-stone-100 bg-[#FAF8F5]/70 hover:border-stone-300 hover:bg-white text-stone-800'
+                                }`}
+                              >
+                                <div className="flex flex-col min-w-0 pr-2">
+                                  <span
+                                    className={`text-xs truncate transition-colors ${
+                                      isSelected
+                                        ? 'font-bold text-lumiere-900'
+                                        : 'font-semibold text-stone-900 group-hover:text-lumiere-800'
+                                    }`}
+                                  >
+                                    {b.name}
+                                  </span>
+                                  {b.origin && (
+                                    <span className="text-[10px] text-stone-500 font-medium">
+                                      {b.origin}
+                                    </span>
+                                  )}
+                                </div>
+                                <span
+                                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                    isSelected
+                                      ? 'bg-lumiere-700 text-white'
+                                      : 'bg-stone-200/80 text-stone-600 group-hover:bg-stone-200'
+                                  }`}
+                                >
+                                  {b.product_count ?? 0} sp
+                                </span>
+                              </Link>
+                            );
+                          })}
+                        </div>
+
+                        <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
+                          <span className="flex items-center gap-1.5 font-medium text-stone-600">
+                            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                            <span>100% Chính hãng • Đầy đủ hoá đơn VAT</span>
+                          </span>
+                          <Link
+                            to="/products"
+                            onClick={() => setBrandDropdownOpen(false)}
+                            className="font-semibold text-stone-800 hover:text-lumiere-700"
+                          >
+                            Lọc nâng cao →
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {categories.map((cat) => {
                   const isCatActive = String(activeCategoryId) === String(cat.id);
+                  // Nếu khách đang chọn xem thương hiệu X, kiểm tra xem X có sản phẩm thuộc danh mục này không
+                  const brandSupportsCategory =
+                    activeBrandId &&
+                    Array.isArray(cat.brand_ids) &&
+                    cat.brand_ids.includes(Number(activeBrandId));
+
+                  // Giữ nguyên brand_id để không bị reset khi chuyển danh mục
+                  const categoryUrl = brandSupportsCategory
+                    ? `/products?category_id=${cat.id}&brand_id=${activeBrandId}`
+                    : `/products?category_id=${cat.id}`;
+
                   return (
                     <Link
                       key={cat.id}
-                      to={`/products?category_id=${cat.id}`}
+                      to={categoryUrl}
                       className={`whitespace-nowrap transition-colors ${
                         isCatActive
                           ? 'font-bold text-lumiere-700'
@@ -512,7 +663,11 @@ export function StorefrontLayout({ children }) {
 
               <div className="flex items-center gap-5 shrink-0 pl-4 border-l border-stone-200/80">
                 <Link
-                  to="/products?sort=newest"
+                  to={
+                    activeBrandId
+                      ? `/products?brand_id=${activeBrandId}&sort=newest`
+                      : '/products?sort=newest'
+                  }
                   className={`whitespace-nowrap font-semibold transition-colors ${
                     activeSort === 'newest'
                       ? 'text-lumiere-700'
@@ -522,7 +677,11 @@ export function StorefrontLayout({ children }) {
                   Hàng mới về
                 </Link>
                 <Link
-                  to="/products?max_price=300000"
+                  to={
+                    activeBrandId
+                      ? `/products?brand_id=${activeBrandId}&max_price=300000`
+                      : '/products?max_price=300000'
+                  }
                   className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold transition-colors ${
                     activeMaxPrice === '300000'
                       ? 'bg-lumiere-700 text-white'
@@ -612,6 +771,43 @@ export function StorefrontLayout({ children }) {
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
+
+            {/* Duyệt theo Thương hiệu chính hãng trên Mobile */}
+            {brands.length > 0 && (
+              <div className="border-t border-stone-100 pt-3 space-y-2">
+                <div className="flex items-center justify-between px-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-stone-400">
+                    Thương hiệu chính hãng ({brands.length})
+                  </p>
+                  <Link
+                    to="/products"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="text-[11px] font-semibold text-lumiere-700 hover:underline"
+                  >
+                    Xem tất cả
+                  </Link>
+                </div>
+                <div className="flex flex-wrap gap-1.5 px-1">
+                  {brands.map((b) => {
+                    const isSelected = String(activeBrandId) === String(b.id);
+                    return (
+                      <Link
+                        key={b.id}
+                        to={`/products?brand_id=${b.id}`}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold transition-all ${
+                          isSelected
+                            ? 'border-lumiere-700 bg-lumiere-700 text-white'
+                            : 'border-stone-200 bg-[#FAF8F5] text-stone-800 hover:border-stone-400'
+                        }`}
+                      >
+                        {b.name}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Tiện ích đơn hàng & Tài khoản trên Mobile */}
             <div className="border-t border-stone-100 pt-3 space-y-2.5">

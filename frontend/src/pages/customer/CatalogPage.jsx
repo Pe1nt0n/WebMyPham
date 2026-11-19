@@ -134,10 +134,31 @@ export function CatalogPage() {
     };
   }, [filters, reloadTick]);
 
-  // Cập nhật 1 hoặc nhiều trường lọc lên URL
+  // Cập nhật 1 hoặc nhiều trường lọc lên URL với cơ chế giải quyết xung đột thông minh giữa Danh mục & Thương hiệu
   const handleUpdateFilters = useCallback(
     (patch) => {
       const next = new URLSearchParams(searchParams);
+
+      // Nếu người dùng chọn 1 thương hiệu mới mà danh mục đang chọn không có sản phẩm của thương hiệu đó -> tự động gỡ bỏ danh mục xung đột để tránh màn hình 0 sản phẩm
+      if (patch.brand_id && patch.brand_id !== '' && patch.category_id === undefined) {
+        const targetBrand = brands.find((b) => String(b.id) === String(patch.brand_id));
+        if (targetBrand?.category_ids?.length > 0 && filters.category_id) {
+          if (!targetBrand.category_ids.includes(Number(filters.category_id))) {
+            next.delete('category_id');
+          }
+        }
+      }
+
+      // Ngược lại, nếu người dùng chọn 1 danh mục mới mà thương hiệu đang chọn không thuộc danh mục đó -> tự động gỡ bỏ thương hiệu
+      if (patch.category_id && patch.category_id !== '' && patch.brand_id === undefined) {
+        const targetCategory = categories.find((c) => String(c.id) === String(patch.category_id));
+        if (targetCategory?.brand_ids?.length > 0 && filters.brand_id) {
+          if (!targetCategory.brand_ids.includes(Number(filters.brand_id))) {
+            next.delete('brand_id');
+          }
+        }
+      }
+
       Object.entries(patch).forEach(([key, val]) => {
         const strVal = val === undefined || val === null ? '' : String(val).trim();
         if (!strVal || (key === 'sort' && strVal === 'newest')) {
@@ -148,7 +169,7 @@ export function CatalogPage() {
       });
       setSearchParams(next);
     },
-    [searchParams, setSearchParams]
+    [searchParams, setSearchParams, brands, categories, filters.category_id, filters.brand_id]
   );
 
   // Xóa toàn bộ điều kiện lọc
@@ -291,44 +312,137 @@ export function CatalogPage() {
               </p>
             </div>
 
-            {/* Quick Category Pills */}
-            {categories.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
+            {/* Quick Category & Brand Pills */}
+            <div className="space-y-2.5">
+              {/* Category Pills */}
+              {categories.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mr-1 hidden sm:inline">
+                    Danh mục:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateFilters({ category_id: '' })}
+                    className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
+                      !filters.category_id
+                        ? 'bg-stone-950 text-white shadow-sm'
+                        : 'border border-stone-200 bg-white text-stone-700 hover:border-stone-400'
+                    }`}
+                  >
+                    {selectedBrand ? `Tất cả SP của ${selectedBrand.name}` : 'Tất cả'}
+                  </button>
+                  {categories.map((cat) => {
+                    const isCurrent = String(filters.category_id) === String(cat.id);
+                    const brandHasCat = selectedBrand
+                      ? selectedBrand.category_ids?.includes(Number(cat.id))
+                      : true;
+
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() =>
+                          handleUpdateFilters({
+                            category_id: isCurrent ? '' : String(cat.id),
+                          })
+                        }
+                        className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
+                          isCurrent
+                            ? 'bg-lumiere-700 text-white shadow-sm'
+                            : brandHasCat
+                            ? 'border border-stone-200 bg-white text-stone-700 hover:border-lumiere-300 hover:text-lumiere-800'
+                            : 'border border-dashed border-stone-200 bg-stone-50/70 text-stone-400 hover:border-stone-300'
+                        }`}
+                        title={
+                          selectedBrand && !brandHasCat
+                            ? `${selectedBrand.name} không có sản phẩm trong danh mục ${cat.name}`
+                            : undefined
+                        }
+                      >
+                        <span>{cat.name}</span>
+                        {selectedBrand && !brandHasCat && (
+                          <span className="ml-1 text-[10px] text-stone-400 font-normal">(0 sp)</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Brand Pills */}
+              {brands.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mr-1 hidden sm:inline">
+                    Thương hiệu:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateFilters({ brand_id: '' })}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
+                      !filters.brand_id
+                        ? 'bg-stone-950 text-white shadow-sm'
+                        : 'border border-stone-200 bg-white text-stone-700 hover:border-stone-400'
+                    }`}
+                  >
+                    Tất cả hãng
+                  </button>
+                  {brands.map((b) => {
+                    const isCurrent = String(filters.brand_id) === String(b.id);
+                    return (
+                      <button
+                        key={b.id}
+                        type="button"
+                        onClick={() =>
+                          handleUpdateFilters({
+                            brand_id: isCurrent ? '' : String(b.id),
+                          })
+                        }
+                        className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
+                          isCurrent
+                            ? 'bg-lumiere-700 text-white shadow-sm font-bold'
+                            : 'border border-stone-200 bg-white text-stone-700 hover:border-lumiere-300 hover:text-lumiere-800'
+                        }`}
+                      >
+                        {b.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Thanh trạng thái Thương hiệu đang chọn giúp duyệt sản phẩm không bị reset */}
+          {selectedBrand && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-lumiere-50/90 border border-lumiere-200/90 px-4 py-2.5 text-xs text-lumiere-950 shadow-xs animate-fade-in">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-lumiere-700 shrink-0" />
+                <span>
+                  Đang xem các sản phẩm chính hãng của thương hiệu{' '}
+                  <strong className="font-bold underline decoration-lumiere-400">{selectedBrand.name}</strong>
+                  {selectedBrand.origin ? ` (${selectedBrand.origin})` : ''} • {products.length} sản phẩm
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {filters.category_id && (
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateFilters({ category_id: '' })}
+                    className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-stone-700 border border-stone-200 hover:bg-stone-50 transition-colors"
+                  >
+                    ✕ Xem tất cả SP {selectedBrand.name}
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => handleUpdateFilters({ category_id: '' })}
-                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                    !filters.category_id
-                      ? 'bg-stone-950 text-white shadow-sm'
-                      : 'border border-stone-200 bg-white text-stone-700 hover:border-stone-400'
-                  }`}
+                  onClick={() => handleUpdateFilters({ brand_id: '' })}
+                  className="rounded-full bg-stone-950 px-3 py-1 text-[11px] font-semibold text-white hover:bg-lumiere-800 transition-colors"
                 >
-                  Tất cả
+                  ✕ Xem tất cả các hãng
                 </button>
-                {categories.map((cat) => {
-                  const isCurrent = String(filters.category_id) === String(cat.id);
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() =>
-                        handleUpdateFilters({
-                          category_id: isCurrent ? '' : String(cat.id),
-                        })
-                      }
-                      className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                        isCurrent
-                          ? 'bg-lumiere-700 text-white shadow-sm'
-                          : 'border border-stone-200 bg-white text-stone-700 hover:border-lumiere-300 hover:text-lumiere-800'
-                      }`}
-                    >
-                      {cat.name}
-                    </button>
-                  );
-                })}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -543,14 +657,33 @@ export function CatalogPage() {
                   Hiện chưa có dòng mỹ phẩm nào khớp với tất cả tiêu chí lọc đang chọn. Bạn có thể
                   mở rộng khoảng giá hoặc gỡ bớt điều kiện lọc để xem thêm gợi ý.
                 </p>
-                <button
-                  type="button"
-                  onClick={handleResetAll}
-                  className="mt-6 inline-flex items-center gap-2 rounded-full bg-stone-950 px-6 py-3 text-sm font-bold text-white shadow-sm hover:bg-lumiere-800 transition-colors"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  <span>Xem tất cả mỹ phẩm</span>
-                </button>
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                  {selectedBrand && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleUpdateFilters({
+                          category_id: '',
+                          search: '',
+                          skin_type: '',
+                          min_price: '',
+                          max_price: '',
+                        })
+                      }
+                      className="inline-flex items-center gap-2 rounded-full border border-lumiere-300 bg-lumiere-50 px-5 py-2.5 text-xs font-bold text-lumiere-800 hover:bg-lumiere-100 transition-colors"
+                    >
+                      <span>Xem tất cả sản phẩm của {selectedBrand.name}</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleResetAll}
+                    className="inline-flex items-center gap-2 rounded-full bg-stone-950 px-6 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-lumiere-800 transition-colors"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    <span>Xem tất cả mỹ phẩm</span>
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
